@@ -1,0 +1,15 @@
+*.o
+.vscode
+.tmp_versio
+*.cmd
+*-safe
+*.mod
+settings.json
+*mod*.c
+tmp.c
+boot.cmd.default
+Makefile
+Module.symvers
+modules.order
+*.ko
+.vscode/settings.json
