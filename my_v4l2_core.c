@@ -1,7 +1,9 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/version.h>
 
 #include "my_v4l2.h"
+#include "my_v4l2_ioctl.h"
 
 #define VID_MODULE_NAME "my_v4l2_vid"
 
@@ -33,7 +35,9 @@ static const struct v4l2_file_operations my_v4l2_fops = {
     .owner = THIS_MODULE,
     .open = my_v4l2_open,
     .release = my_v4l2_release,
-    .unlocked_ioctl = my_v4l2_ioctl,		
+    // ioctl -> unlocked_ioctl -> video_ioctl2 -> my_v4l2_ioctl_ops(函数集) 相当于通过video_ioctl2中转了一次
+	.unlocked_ioctl = video_ioctl2,	
+    // .unlocked_ioctl = my_v4l2_ioctl,			
 };
 
 void _my_v4l2_cap_init(struct v4l2_capability *cap)
@@ -46,10 +50,11 @@ void _my_v4l2_cap_init(struct v4l2_capability *cap)
     // capabilities信息
 	strcpy(cap->driver, "my_v4l2_driver"); // 驱动名称
 	strcpy(cap->card, "my_v4l2_device");   // 设备名称
-	cap->version = 0x0001;          // 版本号
-	cap->capabilities =	V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING 
-									| V4L2_CAP_READWRITE | V4L2_CAP_DEVICE_CAPS;    // 能力，捕获和流 
-	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING | V4L2_CAP_READWRITE;
+	cap->version = KERNEL_VERSION(0, 0, 1);             // 版本号
+	cap->capabilities =	V4L2_CAP_VIDEO_CAPTURE |        // 说明这是一个“视频采集设备”，这里是摄像头；
+                        V4L2_CAP_STREAMING |            // 说明这个设备支持“流式传输”；
+                        V4L2_CAP_DEVICE_CAPS;           // 说明这个设备支持“设备能力”查询；
+	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING; // 实际开放给应用层的能力，是上面能力的子集
 }
 
 
@@ -81,6 +86,7 @@ static int my_v4l2_video_pdrv_probe(struct platform_device *pdev)
     vfd->device_caps = my_v4l2_ctx.cap.device_caps;
     vfd->v4l2_dev->release = my_v4l2_video_device_release;
     vfd->release 	= video_device_release_empty;
+    vfd->ioctl_ops  = &my_v4l2_ioctl_ops;
 	snprintf(vfd->name, sizeof(vfd->name),  "my-v4l2-%03d-vid-cap", 0);
 	video_set_drvdata(vfd, &my_v4l2_ctx);
     erron = video_register_device(vfd, VFL_TYPE_VIDEO, -1);
